@@ -48,7 +48,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
       const [datasetReference] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("reference", "utf-8"),
-          Buffer.from(body.datasetId, "utf-8"),
+          Buffer.from(body.datasetId, "hex"),
         ],
         TOKEN_PROGRAM_ID
       );

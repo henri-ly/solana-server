@@ -26,7 +26,7 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
     const [datasetReference] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("reference", "utf-8"),
-          Buffer.from(datasetId, "utf-8"),
+          Buffer.from(datasetId, "hex"),
         ],
         TOKEN_PROGRAM_ID
     );
