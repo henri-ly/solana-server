@@ -26,7 +26,7 @@ export async function grantPermission(payment: Payment): Promise<void> {
     const dataset = await getDataset(payment.datasetId);
     if (!dataset?.timeseriesIDs) throw Error('Dataset has no timeseries');
 
-    console.log(`New permission granted for the payment ${payment}`)
+    console.log(`New permission granted for the payment ${JSON.stringify(payment)}`)
 
     const promises = [];
     for (const timeseriesIDs of dataset?.timeseriesIDs) {
@@ -34,12 +34,11 @@ export async function grantPermission(payment: Payment): Promise<void> {
         account: config.SOL_ACCOUNT,
         postType: 'Permission',
         content: {
-          timeseriesIDs,
-          autorizer: dataset.owner,
-          status: 'GRANTED',
-          executionCount: 0,
-          maxExecutionCount: -1,
+          authorizer: dataset.owner,
           requestor: payment.signer,
+          datasetID: payment.datasetId,
+          timeseriesIDs,
+          status: 'GRANTED',
         },
         channel: config.FISHNET_CHANNEL,
         APIServer: config.ALEPH_SERVER,

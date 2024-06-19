@@ -1,9 +1,12 @@
 
 import { AccountLayout, TOKEN_PROGRAM_ID, transferCheckedInstructionData } from '@solana/spl-token';
 import { PublicKey, SystemProgram, VersionedTransaction } from '@solana/web3.js';
+import { getMint } from '@solana/spl-token';
 import { getDataset } from '../aleph';
 import { config } from '../config';
 import { Payment } from '../types';
+import BigNumber from 'bignumber.js';
+import { TEN } from '../constants';
 
 export async function validateTransfer(signature: string, datasetId: string): Promise<Payment> {
     const response = await config.RPC.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
@@ -23,6 +26,8 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
     }));
 
     const dataset = await getDataset(datasetId);
+    if (!dataset || !dataset.price) throw new Error('dataset free or error fetching it');
+
     const [datasetReference] = PublicKey.findProgramAddressSync(
         [
           Buffer.from("reference", "utf-8"),
@@ -35,8 +40,9 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
         SystemProgram.programId
     );
 
-    const sellerATA = await config.RPC.getAccountInfo(source.pubkey, 'confirmed');
-    const signerATA = await config.RPC.getAccountInfo(destination.pubkey, 'confirmed');
+
+    const signerATA = await config.RPC.getAccountInfo(source.pubkey, 'confirmed');
+    const sellerATA = await config.RPC.getAccountInfo(destination.pubkey, 'confirmed');
     if (!sellerATA || !signerATA) throw new Error('error fetching ata info');
 
     const decodedSellerATA = AccountLayout.decode(sellerATA.data);
@@ -44,10 +50,13 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
     const seller = decodedSellerATA.owner.toString();
     const signer = decodedSignerATA.owner.toString();
 
-    if (amount.toString(16) === dataset.price) throw new Error('amount not transferred');
-    if (datasetReference.toString() === txDatasetReference.toString()) throw new Error('wrong dataset reference');
-    if (appReference.toString() === txAppReference.toString()) throw new Error('wrong app reference');
-    if (seller.toString() === dataset.owner) throw new Error('wrong seller');
+    const mintData = await getMint(config.RPC, mint.pubkey);
+    const price = BigNumber(dataset.price).times(TEN.pow(mintData.decimals)).integerValue(BigNumber.ROUND_FLOOR);
+
+    if (amount.toString() !== price.toString()) throw new Error('amount not transferred');
+    if (datasetReference.toString() !== txDatasetReference.pubkey.toString()) throw new Error('wrong dataset reference');
+    if (appReference.toString() !== txAppReference.pubkey.toString()) throw new Error('wrong app reference');
+    if (seller.toString() !== dataset.owner) throw new Error('wrong seller');
 
     return {
         signature,

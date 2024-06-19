@@ -41,7 +41,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
         });
       }
 
-      const amount = new BigNumber(dataset.price, 16);
+      const amount = new BigNumber(dataset.price);
       const signer = new PublicKey(body.signer);
       const mint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC mint
 
@@ -94,7 +94,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
 
       const serializedTransaction = await prepareTransaction(transferInstruction, signer);
 
-      return new Response(JSON.stringify({ message: serializedTransaction }), {
+      return new Response(JSON.stringify({ transaction: serializedTransaction }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       });
