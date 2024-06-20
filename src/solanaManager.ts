@@ -3,7 +3,7 @@ import { createSPLTokenInstruction } from "./solana/transferInstruction";
 import { prepareTransaction } from "./solana/prepareTransaction";
 import { validateTransfer } from "./solana/validateTransfer";
 import { getDataset } from "./aleph";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, getMint } from "@solana/spl-token";
 import BigNumber from 'bignumber.js';
 import { Elysia, t } from "elysia";
 import { config } from "./config";
@@ -172,7 +172,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
           $signer: transaction.signer,
           $seller: transaction.seller,
           $currency: transaction.currency,
-          $amount: parseFloat(transaction.amount),
+          $amount: transaction.amount,
           $timestamp: transaction.timestamp,
           $permissionHashes: JSON.stringify(transaction.permissionHashes),
         });
@@ -204,8 +204,17 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
 
     try {
       const query = db.query("SELECT * FROM transactions WHERE signer = $signer");
-      const transactions = query.all({ $signer: address });
-  
+      // note: now is forced USDC
+      const mintData = await getMint(config.RPC, new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'));
+      const rawTransaction = query.all({ $signer: address });
+      const transactions = rawTransaction.map((transaction: any) => {
+        const amountInDecimal = new BigNumber(transaction.amount, 16);
+        const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(mintData.decimals));
+        transaction.amount = amountWithDecimals.toString(16);
+        
+        return transaction;
+      });
+
       return new Response(JSON.stringify(transactions), {
         headers: { "Content-Type": "application/json" }
       });
