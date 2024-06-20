@@ -33,3 +33,7 @@ export interface Payment {
     amount: string;
     timestamp: string;
 }
+
+export type Transaction = Payment & {
+    permissionHashes: string[];
+}

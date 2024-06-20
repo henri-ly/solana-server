@@ -7,7 +7,7 @@ new Elysia()
     .use(
         cors({
             origin: '*', // config.APP_URL
-            methods: ['POST'],
+            methods: ['POST', 'GET'],
             allowedHeaders: ['Content-Type'],
         })
     )

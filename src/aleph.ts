@@ -21,7 +21,7 @@ export async function getDataset(datasetId: string): Promise<Dataset> {
   }
 }
 
-export async function grantPermission(payment: Payment): Promise<void> {
+export async function grantPermission(payment: Payment): Promise<string[]> {
   try {
     const dataset = await getDataset(payment.datasetId);
     if (!dataset?.timeseriesIDs) throw Error('Dataset has no timeseries');
@@ -49,7 +49,8 @@ export async function grantPermission(payment: Payment): Promise<void> {
       promises.push(Publish(postConfig));
     }
     
-    await Promise.all(promises);
+    const responses = await Promise.all(promises);
+    return responses.map((post) => post.item_hash);
   } catch (error) {
     const message = `Error posting permission message: ${error}`;
     console.error(message);

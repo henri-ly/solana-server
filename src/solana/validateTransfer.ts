@@ -2,13 +2,13 @@
 import { AccountLayout, TOKEN_PROGRAM_ID, transferCheckedInstructionData } from '@solana/spl-token';
 import { PublicKey, SystemProgram, VersionedTransaction } from '@solana/web3.js';
 import { getMint } from '@solana/spl-token';
-import { getDataset } from '../aleph';
+import { getDataset, grantPermission } from '../aleph';
 import { config } from '../config';
-import { Payment } from '../types';
+import { Transaction } from '../types';
 import BigNumber from 'bignumber.js';
 import { TEN } from '../constants';
 
-export async function validateTransfer(signature: string, datasetId: string): Promise<Payment> {
+export async function validateTransfer(signature: string, datasetId: string): Promise<Transaction> {
     const response = await config.RPC.getTransaction(signature, { commitment: 'confirmed', maxSupportedTransactionVersion: 0 });
     if (!response) throw new Error('transaction not found');
 
@@ -40,7 +40,6 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
         SystemProgram.programId
     );
 
-
     const signerATA = await config.RPC.getAccountInfo(source.pubkey, 'confirmed');
     const sellerATA = await config.RPC.getAccountInfo(destination.pubkey, 'confirmed');
     if (!sellerATA || !signerATA) throw new Error('error fetching ata info');
@@ -58,7 +57,7 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
     if (appReference.toString() !== txAppReference.pubkey.toString()) throw new Error('wrong app reference');
     if (seller.toString() !== dataset.owner) throw new Error('wrong seller');
 
-    return {
+    const payment = {
         signature,
         datasetId,
         signer,
@@ -67,4 +66,7 @@ export async function validateTransfer(signature: string, datasetId: string): Pr
         amount: amount.toString(16),
         timestamp: new Date().toISOString(),
     };
+    const permissionHashes = await grantPermission(payment);
+    
+    return { ...payment, permissionHashes };
 }
