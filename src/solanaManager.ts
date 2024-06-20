@@ -14,7 +14,7 @@ export type CreateTransactionParams = {
   signer: string;
 }
 
-export type SendTransactionParams = {
+export type SendTransaction = {
   datasetId: string;
   transaction: string,
 }
@@ -109,7 +109,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
     }
   })
 
-  .post('/sendTransaction', async ({ body }: { body: SendTransactionParams }) => {
+  .post('/sendTransaction', async ({ body }: { body: SendTransaction }) => {
     const transactionBuffer = Buffer.from(body.transaction, 'base64');
     const deserializedTransaction = VersionedTransaction.deserialize(transactionBuffer);
 
@@ -162,19 +162,19 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
       const transaction = await validateTransfer(signature, body.datasetId);
 
       const insert = db.prepare(`
-        INSERT INTO transactions (signature, permissionHash, datasetId, signer, seller, currency, amount, timestamp)
-        VALUES ($signature, $permissionHash, $datasetId, $signer, $seller, $currency, $amount, $timestamp)
+        INSERT INTO transactions (signature, datasetId, signer, seller, currency, amount, timestamp, permissionHashes)
+        VALUES ($signature, $datasetId, $signer, $seller, $currency, $amount, $timestamp, $permissionHashes)
       `);
       const insertPayment = db.transaction((transaction) => {
         insert.run({
           $signature: transaction.signature,
-          $permissionHash: transaction.permissionHash,
           $datasetId: transaction.datasetId,
           $signer: transaction.signer,
           $seller: transaction.seller,
           $currency: transaction.currency,
           $amount: parseFloat(transaction.amount),
           $timestamp: transaction.timestamp,
+          $permissionHashes: JSON.stringify(transaction.permissionHashes),
         });
       });
       insertPayment(transaction);
