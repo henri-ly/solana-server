@@ -27,6 +27,7 @@ export interface DatasetMessage {
 export interface Payment {
     signature: string;
     datasetId: string;
+    datasetName: string;
     signer: string;
     seller: string;
     currency: string;

@@ -21,23 +21,20 @@ export async function getDataset(datasetId: string): Promise<Dataset> {
   }
 }
 
-export async function grantPermission(payment: Payment): Promise<string[]> {
+export async function grantPermission(payment: Payment, timeseriesIDs: string[]): Promise<string[]> {
   try {
-    const dataset = await getDataset(payment.datasetId);
-    if (!dataset?.timeseriesIDs) throw Error('Dataset has no timeseries');
-
     console.log(`New permission granted for the payment ${JSON.stringify(payment)}`)
 
     const promises = [];
-    for (const timeseriesIDs of dataset?.timeseriesIDs) {
+    for (const timeseriesID of timeseriesIDs) {
       const postConfig = {
         account: config.SOL_ACCOUNT,
         postType: 'Permission',
         content: {
-          authorizer: dataset.owner,
+          authorizer: payment.seller,
           requestor: payment.signer,
           datasetID: payment.datasetId,
-          timeseriesIDs,
+          timeseriesID,
           status: 'GRANTED',
         },
         channel: config.FISHNET_CHANNEL,

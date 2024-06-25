@@ -1,9 +1,10 @@
-import { PublicKey, VersionedTransaction, SystemProgram } from "@solana/web3.js";
+import { PublicKey, VersionedTransaction } from "@solana/web3.js";
 import { createSPLTokenInstruction } from "./solana/transferInstruction";
 import { prepareTransaction } from "./solana/prepareTransaction";
 import { validateTransfer } from "./solana/validateTransfer";
+import { APP_REFERENCE, MINT_DECIMALS } from "./constants";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { getDataset } from "./aleph";
-import { TOKEN_PROGRAM_ID, getMint } from "@solana/spl-token";
 import BigNumber from 'bignumber.js';
 import { Elysia, t } from "elysia";
 import { config } from "./config";
@@ -43,22 +44,7 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
         });
       }
 
-      const amount = new BigNumber(dataset.price);
       const signer = new PublicKey(query.signer);
-      const mint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // USDC mint
-
-      const [datasetReference] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("reference", "utf-8"),
-          Buffer.from(query.datasetId, "hex"),
-        ],
-        TOKEN_PROGRAM_ID
-      );
-      const [appReference] = PublicKey.findProgramAddressSync(
-        [Buffer.from("fishnet", "utf-8")],
-        SystemProgram.programId
-      );
-
       const senderInfo = await config.RPC.getAccountInfo(signer);
       if (!senderInfo) {
         const message = 'Sender not found';
@@ -67,31 +53,30 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
           status: 404,
           headers: { 'Content-Type': 'application/json' },
         });
-      } 
-  
-      const recipient = new PublicKey(dataset.owner);
-      const recipientInfo = await config.RPC.getAccountInfo(recipient);  
-      if (!recipientInfo) {
-        const message = 'Recipient not found';
-        console.error(message);
-        return new Response(JSON.stringify({ error: message }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-        });
       }
 
-      /* note: USDC mint is forced as payment for simplicity to not change Dataset schema
-        this should be changed to accept multiple tokens as payment
+      const amount = new BigNumber(dataset.price);
+      const recipient = new PublicKey(dataset.owner);
+      const [datasetReference] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("reference", "utf-8"),
+          Buffer.from(query.datasetId, "hex"),
+        ],
+        TOKEN_PROGRAM_ID
+      );
+
+      /* note: USDC mint is forced as payment for simplicity to not change Dataset schema 
+         which should be changed to accept multiple tokens as payment
 
         const transferInstruction = mint.toString() === 'So11111111111111111111111111111111111111112'
           ? await createSPLTokenInstruction(recipient, amount, splToken, sender, connection)
           : await createSystemInstruction(recipient, amount, sender, connection);
       */
-      const transferInstruction = await createSPLTokenInstruction(recipient, amount, mint, signer, config.RPC);
+      const transferInstruction = await createSPLTokenInstruction(recipient, amount, signer);
 
       transferInstruction.keys.push(
         { pubkey: datasetReference, isWritable: false, isSigner: false },
-        { pubkey: appReference, isWritable: false, isSigner: false }
+        { pubkey: APP_REFERENCE, isWritable: false, isSigner: false }
       );
 
       const serializedTransaction = await prepareTransaction(transferInstruction, signer);
@@ -158,27 +143,9 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
 
       console.log(`${new Date().toISOString()} Transaction successful: https://explorer.solana.com/tx/${signature}`);
 
-      // note: in this validation the permission messages are posted
-      const transaction = await validateTransfer(signature, body.datasetId);
-
-      const insert = db.prepare(`
-        INSERT INTO transactions (signature, datasetId, signer, seller, currency, amount, timestamp, permissionHashes)
-        VALUES ($signature, $datasetId, $signer, $seller, $currency, $amount, $timestamp, $permissionHashes)
-      `);
-      const insertPayment = db.transaction((transaction) => {
-        insert.run({
-          $signature: transaction.signature,
-          $datasetId: transaction.datasetId,
-          $signer: transaction.signer,
-          $seller: transaction.seller,
-          $currency: transaction.currency,
-          $amount: transaction.amount,
-          $timestamp: transaction.timestamp,
-          $permissionHashes: JSON.stringify(transaction.permissionHashes),
-        });
-      });
-      insertPayment(transaction);
-
+      // note: in this validation the permission messages are posted and the transaction info is saved on db
+      await validateTransfer(signature, body.datasetId);
+      
       return new Response(JSON.stringify({ message: 'success', signature }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -194,23 +161,13 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
   }, { body: SendTransactionSchema })
   
   .get('/getTransactions', async ({ query: { address } }: { query: GetTransactionsParams }) => {
-    console.log(address)
-    if (!address) {
-      return new Response(JSON.stringify({ error: 'User address is required' }), {
-        status: 400,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-
     try {
       const query = db.query("SELECT * FROM transactions WHERE signer = $signer");
-      // note: now is forced USDC
-      const mintData = await getMint(config.RPC, new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'));
       const rawTransaction = query.all({ $signer: address });
       const transactions = rawTransaction.map((transaction: any) => {
         const amountInDecimal = new BigNumber(transaction.amount, 16);
-        const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(mintData.decimals));
-        transaction.amount = amountWithDecimals.toString(16);
+        const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
+        transaction.amount = amountWithDecimals;
         
         return transaction;
       });
