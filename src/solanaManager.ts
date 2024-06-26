@@ -162,17 +162,21 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
   
   .get('/getTransactions', async ({ query: { address } }: { query: GetTransactionsParams }) => {
     try {
+      let totalProfit = new BigNumber(0);
+
       const query = db.query("SELECT * FROM transactions WHERE signer = $signer");
       const rawTransaction = query.all({ $signer: address });
       const transactions = rawTransaction.map((transaction: any) => {
         const amountInDecimal = new BigNumber(transaction.amount, 16);
         const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
-        transaction.amount = amountWithDecimals;
-        
+        transaction.amount = amountWithDecimals.toString();
+
+        if (transaction.seller == address) totalProfit = totalProfit.plus(amountWithDecimals);
         return transaction;
       });
 
-      return new Response(JSON.stringify(transactions), {
+      console.log(totalProfit.toString())
+      return new Response(JSON.stringify({ transactions, totalProfit: totalProfit.toString() }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error: any) {
