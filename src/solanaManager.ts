@@ -9,6 +9,7 @@ import BigNumber from 'bignumber.js';
 import { Elysia, t } from "elysia";
 import { config } from "./config";
 import db from "./db";
+import { Transaction } from "./types";
 
 export type CreateTransactionParams = {
   datasetId: string;
@@ -163,20 +164,43 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
   .get('/getTransactions', async ({ query: { address } }: { query: GetTransactionsParams }) => {
     try {
       let totalProfit = new BigNumber(0);
-
+      let totalSales = 0;
+      const purchases: Transaction[] = [];
+      const sales: Transaction[] = [];
+      const datasetSales: Record<string, number> = {};
+      
       const query = db.query("SELECT * FROM transactions WHERE signer = $signer");
       const rawTransaction = query.all({ $signer: address });
+      
       const transactions = rawTransaction.map((transaction: any) => {
         const amountInDecimal = new BigNumber(transaction.amount, 16);
         const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
         transaction.amount = amountWithDecimals.toString();
-
-        if (transaction.seller == address) totalProfit = totalProfit.plus(amountWithDecimals);
+      
+        if (transaction.seller == address) {
+          totalProfit = totalProfit.plus(amountWithDecimals);
+          sales.push(transaction);
+          if (datasetSales[transaction.item]) {
+            datasetSales[transaction.item] += parseFloat(transaction.amount);
+          } else {
+            datasetSales[transaction.item] = parseFloat(transaction.amount);
+          }
+          totalSales++;
+        } else if (transaction.signer == address) {
+          purchases.push(transaction);
+        }
+      
         return transaction;
       });
 
-      console.log(totalProfit.toString())
-      return new Response(JSON.stringify({ transactions, totalProfit: totalProfit.toString() }), {
+      return new Response(JSON.stringify({ 
+        transactions, 
+        totalProfit: totalProfit.toString(),
+        purchases,
+        sales,
+        datasetSales,
+        totalSales,
+      }), {
         headers: { "Content-Type": "application/json" }
       });
     } catch (error: any) {
