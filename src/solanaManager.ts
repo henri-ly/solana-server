@@ -4,12 +4,12 @@ import { prepareTransaction } from "./solana/prepareTransaction";
 import { validateTransfer } from "./solana/validateTransfer";
 import { APP_REFERENCE, MINT_DECIMALS } from "./constants";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { DatasetSales } from "./types";
 import { getDataset } from "./aleph";
 import BigNumber from 'bignumber.js';
 import { Elysia, t } from "elysia";
 import { config } from "./config";
 import db from "./db";
-import { Transaction } from "./types";
 
 export type CreateTransactionParams = {
   datasetId: string;
@@ -31,8 +31,6 @@ export type GetTransactionsParams = {
 }
 
 export const solanaManager = new Elysia({ prefix: '/solana' })
-  // note: would be interesting to save built transactions to validate them on the sendTransaction 
-  // if the transaction was built by this handler
   .get('/createTransaction', async ({ query }: { query: CreateTransactionParams }) => {
     try {
       const dataset = await getDataset(query.datasetId);
@@ -165,29 +163,34 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
     try {
       let totalProfit = new BigNumber(0);
       let totalSales = 0;
-      const purchases: Transaction[] = [];
-      const sales: Transaction[] = [];
-      const datasetSales: Record<string, number> = {};
+      const datasetSales: Record<string, DatasetSales> = {};
       
-      const query = db.query("SELECT * FROM transactions WHERE signer = $signer");
-      const rawTransaction = query.all({ $signer: address });
-      
-      const transactions = rawTransaction.map((transaction: any) => {
+      const purchasesQuery = db.query("SELECT * FROM transactions WHERE signer = $signer");
+      const purchases = purchasesQuery.all({ $signer: address });
+      const salesQuery = db.query("SELECT * FROM transactions WHERE seller = $seller");
+      const sales = salesQuery.all({ $seller: address });
+      const transactions = sales.map((transaction: any) => {
         const amountInDecimal = new BigNumber(transaction.amount, 16);
         const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
-        transaction.amount = amountWithDecimals.toString();
+        const amount = amountWithDecimals.toString();
+        transaction.amount = amount;
       
-        if (transaction.seller == address) {
+        if (transaction.seller === address) {
           totalProfit = totalProfit.plus(amountWithDecimals);
           sales.push(transaction);
-          if (datasetSales[transaction.item]) {
-            datasetSales[transaction.item] += parseFloat(transaction.amount);
+          if (datasetSales[transaction.datasetId]) {
+            const profit = new BigNumber(datasetSales[transaction.datasetId].profit).plus(amountWithDecimals).toString();
+            datasetSales[transaction.datasetId] = {
+              sales: datasetSales[transaction.datasetId].sales++,
+              profit,
+            }
           } else {
-            datasetSales[transaction.item] = parseFloat(transaction.amount);
+            datasetSales[transaction.datasetId] = {
+              sales: 1,
+              profit: amount,
+            };
           }
           totalSales++;
-        } else if (transaction.signer == address) {
-          purchases.push(transaction);
         }
       
         return transaction;

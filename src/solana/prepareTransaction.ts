@@ -1,18 +1,26 @@
 import { TransactionInstruction, PublicKey, ComputeBudgetProgram, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import { config } from "../config";
+import bs58 from "bs58";
 
 export async function prepareTransaction(transferInstruction: TransactionInstruction, payerKey: PublicKey) {
   const instructions = [transferInstruction];
+  const recentBlockhash = (await config.RPC.getLatestBlockhash('finalized')).blockhash;
+  const message = new TransactionMessage({
+    payerKey,
+    recentBlockhash,
+    instructions,
+  }).compileToV0Message();
+  const transactionToEstimatePriority = new VersionedTransaction(message);
+  const microLamports = await getPriorityFeeEstimate('Medium', transactionToEstimatePriority) || 20000;
 
-  const microLamports = await getPriorityFee() || 5000;
   const computePriceInstruction = ComputeBudgetProgram.setComputeUnitPrice({ microLamports });
   instructions.unshift(computePriceInstruction);
 
-  const units = await getComputeUnits([...instructions], payerKey);
-  const computeBudgetInstruction = ComputeBudgetProgram.setComputeUnitLimit({ units });
+  //const units = await getComputeUnits([...instructions], payerKey);
+  const computeBudgetInstruction = ComputeBudgetProgram.setComputeUnitLimit({ units: 6861 });
   instructions.unshift(computeBudgetInstruction);
+  console.log(microLamports)
 
-  const recentBlockhash = (await config.RPC.getLatestBlockhash('finalized')).blockhash;
   const messageV0 = new TransactionMessage({
     payerKey,
     recentBlockhash,
@@ -23,6 +31,7 @@ export async function prepareTransaction(transferInstruction: TransactionInstruc
   return Buffer.from(transaction.serialize()).toString('base64');
 }
 
+// useful if we have dynamic transaction to provide, but for now we are using the same one
 async function getComputeUnits(originalInstructions: TransactionInstruction[], payerKey: PublicKey): Promise<number> {
   // dont modify original instructions array
   const instructions = [...originalInstructions];
@@ -47,7 +56,10 @@ async function getComputeUnits(originalInstructions: TransactionInstruction[], p
   return rpcResponse.value.unitsConsumed || 1400000;
 }
 
-export async function getPriorityFee(): Promise<number | null> {
+// this method makes the transaction building process so slow
+// interesting to use a websocket to read blocks or in an interval, 
+// store median priority in db and get an estimated priority from there
+async function getPriorityFee(): Promise<number | null> {
   const blockHeight = (await config.RPC.getBlockHeight());
   const blockData = await config.RPC.getBlock(blockHeight, { maxSupportedTransactionVersion: 0 });
 
@@ -76,4 +88,24 @@ export async function getPriorityFee(): Promise<number | null> {
   }
 
   return Math.round(medianPriorityFee * 10 ** 6);
+}
+
+async function getPriorityFeeEstimate(priorityLevel: string, transaction: VersionedTransaction) {
+  const response = await fetch(config.RPC.rpcEndpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: "1",
+      method: "getPriorityFeeEstimate",
+      params: [
+        {
+          transaction: bs58.encode(transaction.serialize()),
+          options: { priorityLevel },
+        },
+      ],
+    }),
+  });
+  const data = await response.json();
+  return Number(data.result.priorityFeeEstimate);
 }

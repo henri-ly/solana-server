@@ -38,3 +38,8 @@ export interface Payment {
 export type Transaction = Payment & {
     permissionHashes: string[];
 }
+
+export type DatasetSales = {
+    sales: number
+    profit: string
+}
