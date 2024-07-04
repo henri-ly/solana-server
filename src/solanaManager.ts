@@ -167,9 +167,16 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
       
       const purchasesQuery = db.query("SELECT * FROM transactions WHERE signer = $signer");
       const purchases = purchasesQuery.all({ $signer: address });
+      purchases.map((transaction: any) => {
+        const amountInDecimal = new BigNumber(transaction.amount, 16);
+        const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
+        const amount = amountWithDecimals.toString();
+        transaction.amount = amount;
+      });
+
       const salesQuery = db.query("SELECT * FROM transactions WHERE seller = $seller");
       const sales = salesQuery.all({ $seller: address });
-      const transactions = sales.map((transaction: any) => {
+      sales.map((transaction: any) => {
         const amountInDecimal = new BigNumber(transaction.amount, 16);
         const amountWithDecimals = amountInDecimal.dividedBy(new BigNumber(10).pow(MINT_DECIMALS['USDC']));
         const amount = amountWithDecimals.toString();
@@ -197,7 +204,6 @@ export const solanaManager = new Elysia({ prefix: '/solana' })
       });
 
       return new Response(JSON.stringify({ 
-        transactions, 
         totalProfit: totalProfit.toString(),
         purchases,
         sales,
