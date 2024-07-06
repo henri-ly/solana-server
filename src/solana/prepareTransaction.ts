@@ -11,7 +11,7 @@ export async function prepareTransaction(transferInstruction: TransactionInstruc
     instructions,
   }).compileToV0Message();
   const transactionToEstimatePriority = new VersionedTransaction(message);
-  const microLamports = await getPriorityFeeEstimate('Medium', transactionToEstimatePriority) || 20000;
+  const microLamports = await getPriorityFeeEstimate('High', transactionToEstimatePriority) || 20000;
 
   const computePriceInstruction = ComputeBudgetProgram.setComputeUnitPrice({ microLamports });
   instructions.unshift(computePriceInstruction);
