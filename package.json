@@ -11,7 +11,8 @@
     "aleph-sdk-ts": "^3.9.2",
     "bignumber.js": "^9.1.2",
     "bs58": "^5.0.0",
-    "elysia": "1.0.23"
+    "elysia": "1.0.23",
+    "ethers": "^6.13.1"
   },
   "devDependencies": {
     "bun-types": "latest",
