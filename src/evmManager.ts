@@ -58,14 +58,13 @@ export const evmManager = new Elysia({ prefix: '/evm' })
             chainId: query.blockchain,
             mode: "transfer",
             senders: [query.signer],
-            recipients: ['0xD305428Dd144698324452E6E08adbC804812223F'],
-            amount: amountToSmallestUnit(dataset.price, 6),
+            recipients: ['0x9b7E335088762aD8061C04D08C37902ABC8ACb87'],
+            amount: "2000000000000000",
             useMaxAmount: false,
             fees: "0",
             gas: "0",
             memo: "",
             format: "hex",
-            tokenId: "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E",
             validatorAddress: "",
             params: {
               pubKey: query.signer
@@ -84,6 +83,8 @@ export const evmManager = new Elysia({ prefix: '/evm' })
       });
   
       const responseData = await response.json();
+
+      console.log(JSON.stringify(responseData, null, 2));
 
       if (response.ok) {
         return new Response(JSON.stringify({ transaction: JSON.stringify(responseData.transaction) }), {
@@ -119,6 +120,7 @@ export const evmManager = new Elysia({ prefix: '/evm' })
     try {
       const plain = JSON.parse(body.transaction);
       plain.nonce = plain.nonce.toString();
+      plain.fees = "0x01a42fc1e2e000";
 
       const requestBody = {
         transaction: {
@@ -127,6 +129,8 @@ export const evmManager = new Elysia({ prefix: '/evm' })
           signature: body.signature,
         }
       };
+
+      console.log(JSON.stringify(requestBody, null, 2));
 
       const response = await fetch('https://api.adamik.io/api/transaction/broadcast', {
         method: 'POST',

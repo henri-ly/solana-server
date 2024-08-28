@@ -3,14 +3,23 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run src/index.ts"
+    "dev": "bun run src/index.ts",
+    "src": "bun run src/script.ts",
+    "ethers": "bun run src/ethers-example.ts",
+    "ton": "bun run src/example.ts"
   },
   "dependencies": {
+    "@elysiajs/cors": "^1.1.0",
     "@solana/spl-token": "^0.4.6",
     "@solana/web3.js": "^1.91.8",
+    "@ton/core": "^0.57.0",
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^15.0.0",
     "aleph-sdk-ts": "^3.9.2",
+    "axios": "^1.7.3",
     "bignumber.js": "^9.1.2",
     "bs58": "^5.0.0",
+    "buffer": "^6.0.3",
     "elysia": "1.0.23",
     "ethers": "^6.13.1"
   },
